@@ -58,7 +58,7 @@ namespace Insight.Tests
 	interface ITestWithSpecialParameters
 	{
 		void ExecuteSomething(int? commandTimeout);
-		Task ExecuteSomethingAsync(CancellationToken? cancellationToken);
+		Task ExecuteSomethingAsync(CancellationToken cancellationToken);
 
 		[Sql("ExecuteSomething")]
 		void ExecuteSomethingWithTransaction(IDbTransaction transaction);
