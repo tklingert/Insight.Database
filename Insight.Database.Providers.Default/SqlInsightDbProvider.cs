@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -8,10 +9,9 @@ using System.Data.SqlTypes;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Xml;
 using Insight.Database.CodeGenerator;
 using Insight.Database.Providers;
 
@@ -208,7 +208,7 @@ namespace Insight.Database
 					CommandBehavior.Default));
 
 			// create the structured parameter
-			parameter.Value = new ObjectListDbDataReader(objectReader, list);
+			parameter.Value = new InsightRowNumberPopulatingObjectListDbDataReader(objectReader, list);
 		}
 
 		/// <summary>
@@ -572,6 +572,83 @@ namespace Insight.Database
 				}
 			}
 		}
+		#endregion
+
+		#region Helper classes
+
+		/// <summary>
+		/// 	Reads an object list as a data reader and populates to current reader's position to the '_insight_rownumber' field, if available.
+		/// 	Not intended to be used directly from object code.
+		/// </summary>
+		/// <remarks>
+		/// 	Used to avoid the 'INSERT into an identity column not allowed on table variables'-issue by generating the identity value under the hood on client side.
+		/// </remarks>
+		private class InsightRowNumberPopulatingObjectListDbDataReader : ObjectListDbDataReader
+		{
+			#region Private
+
+			/// <summary>
+			/// A flag indicating whether the underlying object reader contains the '_insight_rownumber'-field.
+			/// </summary>
+			private readonly bool _hasInsightRowNumber;
+
+			/// <summary>
+			/// The ordinal position of the '_insight_rownumber'-field.
+			/// </summary>
+			private readonly int _insightRowNumberOrdinal;
+
+			/// <summary>
+			/// The current row number.
+			/// </summary>
+			private int _currentInsightRowNumber;
+
+			#endregion
+
+			#region Public
+
+			/// <summary>	Initializes a new instance of the InsightRowNumberPopulatingObjectListDbDataReader class. </summary>
+			/// <param name="objectReader">	The object reader.</param>
+			/// <param name="list">		   	The list.</param>
+			public InsightRowNumberPopulatingObjectListDbDataReader(ObjectReader objectReader, IEnumerable list)
+				: base(objectReader, list)
+			{
+				this._insightRowNumberOrdinal = objectReader.GetOrdinal("_insight_rownumber");
+				this._hasInsightRowNumber = this._insightRowNumberOrdinal >= 0;
+			}
+
+			#endregion
+
+			#region Overrides of ObjectListDbDataReader
+
+			/// <summary>	Get the value of the given column. </summary>
+			/// <param name="ordinal">	The index of the column.</param>
+			/// <returns>	The value of the column. </returns>
+			public override object GetValue(int ordinal)
+			{
+				if (this._hasInsightRowNumber && ordinal == this._insightRowNumberOrdinal)
+					return this._currentInsightRowNumber;
+				return base.GetValue(ordinal);
+			}
+
+			/// <summary>	Read the next item from the reader. </summary>
+			/// <returns>	True if an item was read, false if there were no more items. </returns>
+			public override bool Read()
+			{
+				if (base.Read())
+				{
+					if (this._hasInsightRowNumber)
+						Interlocked.Increment(ref this._currentInsightRowNumber);
+					return true;
+				}
+
+				if (this._hasInsightRowNumber)
+					Interlocked.Exchange(ref this._currentInsightRowNumber, 0);
+				return false;
+			}
+
+			#endregion
+		}
+
 		#endregion
 	}
 }

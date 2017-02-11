@@ -115,6 +115,28 @@ CREATE PROC InsertByTable(@OtherValue int, @Items [InsertByTableType] READONLY) 
 		SELECT Text, @OtherValue FROM @Items
 GO
 
+CREATE TABLE InsertByTableInsightRNTable (ID [int] IDENTITY(1,1), ID2 [int] DEFAULT (42), Text [varchar](128), Value int)
+GO
+CREATE TYPE InsertByTableInsightRNType AS TABLE (Text [varchar](128), Value int, [_insight_rownumber] INT NOT NULL)
+GO
+CREATE PROC InsertByTableInsightRN(@OtherValue int, @Items [InsertByTableInsightRNType] READONLY) AS 
+    DECLARE @OutputRows TABLE(ID [int], ID2 [int])
+
+	TRUNCATE TABLE InsertByTableInsightRNTable
+	DBCC CHECKIDENT ('InsertByTableInsightRNTable', RESEED, 1)
+
+	INSERT INTO InsertByTableInsightRNTable (Text, Value)
+		OUTPUT inserted.ID, inserted.ID2
+		INTO @OutputRows
+		SELECT Text, [_insight_rownumber] FROM @Items
+		ORDER BY [_insight_rownumber] -- retain the order as passed from insight
+
+	SELECT o.ID, o.ID2, t.[Value] FROM @OutputRows as o
+		INNER JOIN InsertByTableInsightRNTable as t -- only to return the [_insight_rownumber] passed in to the output again & verify it
+			on o.Id = t.Id
+	ORDER BY o.ID -- [Id] represents order inserted
+GO
+
 ----------------------------------------------------------
 -- General test types
 ----------------------------------------------------------

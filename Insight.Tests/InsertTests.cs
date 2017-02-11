@@ -80,6 +80,28 @@ namespace Insight.Tests
 			Assert.AreEqual(2, i2.Id2);
 		}
 
+		/// <summary>
+		/// Make sure that a multiple insert can return identities and populates the [_insight_rownumber] column correctly if specified
+		/// Note that here we have to specify the parameters AND the list of objects that we want to treat as an insert.
+		/// </summary>
+		[Test]
+		public void MultipleInsertShouldFillInIdentities_SupportsInsightRownumber( )
+		{
+			InsertRecord i = new InsertRecord( );
+			InsertRecord i2 = new InsertRecord( );
+			List<InsertRecord> list = new List<InsertRecord>( ) { i, i2 };
+
+			var result = Connection( ).InsertList( "InsertByTableInsightRN", list, new { OtherValue = 5, Items = list } );
+
+			Assert.AreEqual( list, result );
+			Assert.AreEqual( 1, i.Id );
+			Assert.AreEqual( 42, i.Id2 );
+			Assert.AreEqual( 1, i.Value ); // the procedure maps the provided [_insight_rownumber] value to this property
+			Assert.AreEqual( 2, i2.Id );
+			Assert.AreEqual( 42, i2.Id2 );
+			Assert.AreEqual( 2, i2.Value ); // the procedure maps the provided [_insight_rownumber] value to this property
+		}
+
 		[Test]
 		public void SingleInsertSqlShouldFillInIdentities()
 		{
